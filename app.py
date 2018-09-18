@@ -1,7 +1,6 @@
-from flask import Flask, request, Response
 import json
-
-app = Flask(__name__)
+from flask import request, Response
+from db.settings import *
 
 
 def get_data(file='data/customers.json'):
@@ -14,10 +13,11 @@ def get_customer_by_id(id):
     if bool(customers):
         for index, customer in enumerate(customers):
             if customer.get('customerID') == id:
-                return [index, customer]
+                return [index, customer, customers]
     return {}
 
 
+# GET /landing page
 @app.route("/")
 def welcome():
     return "Landing page"
@@ -35,26 +35,50 @@ def get_customers():
     )
 
 
+# GET /customers/:customer_id
 @app.route("/customers/<int:customer_id>")
 def get_customer(customer_id):
     customer = get_customer_by_id(customer_id)[1]
     if bool(customer):
-        return Response(json.dumps(customer), mimetype="application/json")
+        response = Response(json.dumps(customer), mimetype="application/json", status=204)
+        response.headers["Location"] = "/customers/" + customer_id
+        return response
     return Response(json.dumps({}), mimetype="application/json", status=404)
 
 
+# POST /customers
 @app.route("/customers", methods=["POST"])
 def add_customer():
-    return Response(json.dumps(request.get_json()), mimetype="application/json", status=201)
+    customers = get_data()
+    customer = request.get_json()
+    customers.insert(customer)
+    response = Response(mimetype="application/json", status=201)
+    response.headers["Location"] = "/customers/" + customer.customerID
+    return response
 
 
+# PUT /customers/:customer_id
 @app.route("/customers/<int:customer_id>", methods=["PUT"])
 def replace_customer(customer_id):
     customers = get_data()
     [index, customer] = get_customer_by_id(customer_id)
     if bool(customer):
         customers[index] = request.get_data()
-        return Response(mimetype="application/json", status=204)
+        response = Response(mimetype="application/json", status=204)
+        response.headers["Location"] = "/customers/" + customer_id
+        return response
+    return Response(mimetype="application/json", status=404)
+
+
+# DELETE /customers/:customer_id
+@app.route("/customers/<int:customer_id>", methods=["DELETE"])
+def delete_customer(customer_id):
+    [index, customer, customers] = get_customer_by_id(customer_id)
+    if bool(customer):
+        customers.pop(index)
+        response = Response(mimetype="application/json", status=204)
+        response.headers["Location"] = "/customers/" + customer_id
+        return response
     return Response(mimetype="application/json", status=404)
 
 
